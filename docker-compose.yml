@@ -1,0 +1,65 @@
+version: "3.4"
+
+services:
+  nginx:
+    image: nginx:alpine
+    ports:
+      - ${APP_PORT:-8080}:80
+    volumes:
+      - ./app:/var/www
+      - ./.docker/nginx:/etc/nginx/conf.d
+    tty: true
+    depends_on:
+      - app
+    networks:
+      - app
+
+  app:
+    build:
+      context: ./.docker/app
+      dockerfile: Dockerfile
+    volumes:
+      - ./app:/var/www
+      - ./.docker/app/php.ini:/usr/local/etc/php/conf.d/local.ini
+    tty: true
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    depends_on:
+      - mariadb
+    networks:
+      - app
+  
+  node:
+    image: node:20-alpine
+    volumes:
+      - ./:/app
+    working_dir: /app
+    networks:
+      - app
+
+  mariadb:
+    image: mariadb:latest
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE:-app}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}
+      MYSQL_ROOT_HOST: "%"
+      MYSQL_ALLOW_EMPTY_PASSWORD: yes
+    volumes:
+      - ./tmp/mariadb:/var/lib/mysql
+    networks:
+      - app
+
+  phpmyadmin:
+    image: phpmyadmin
+    ports:
+      - ${PMA_PORT:-8180}:80
+    environment:
+      PMA_HOST: mariadb
+      PMA_USER: root
+      PMA_PASSWORD: ${DB_PASSWORD:-root}
+    networks:
+      - app
+
+networks:
+  app:
+    driver: bridge
